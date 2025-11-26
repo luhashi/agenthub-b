@@ -1,0 +1,35 @@
+[project]
+name = "serverless-agent-host"
+version = "0.1.0"
+description = "Serverless FastAPI app hosting LangGraph agents and MCP tools"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "basic-pitch==0.4.0",
+    "fastapi>=0.104.1",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai",
+    "langchain-anthropic",
+    "langchain-google-genai",
+    "langchain-mcp-adapters",
+    "langgraph",
+    "librosa>=0.10.0",
+    "numpy>=1.20.0,<2.0",
+    "onnxruntime>=1.23.2",
+    "pretty-midi>=0.2.5",
+    "python-dotenv>=0.21.0",
+    "python-multipart>=0.0.20",
+    "scipy>=1.4.0",
+    "setuptools>=80.9.0",
+    "soundfile>=0.12.0",
+    "sse-starlette>=2.2.1",
+    "uvicorn>=0.24.0",
+    "httpx"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
