@@ -160,7 +160,8 @@ async def log_workout(name: str, exercises: List[dict], config: RunnableConfig, 
         return "Error: Database connection not configured."
     
     try:
-        conn = await asyncpg.connect(database_url)
+        # Force SSL mode for Neon DB
+        conn = await asyncpg.connect(database_url, ssl='require')
         try:
             # 1. Get or Create FitnessProfile
             profile_id = await conn.fetchval(
@@ -248,7 +249,8 @@ async def get_workout_history(config: RunnableConfig) -> str:
         return "Error: Database connection not configured."
     
     try:
-        conn = await asyncpg.connect(database_url)
+        # Force SSL mode for Neon DB
+        conn = await asyncpg.connect(database_url, ssl='require')
         try:
             # Get fitness profile
             profile = await conn.fetchrow(
