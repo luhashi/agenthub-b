@@ -83,7 +83,8 @@ async def log_health_entry(
     if steps is not None:
         metrics.append({"metric_type": "STEPS", "value": steps, "unit": "steps"})
 
-    url = "http://localhost:3000/api/user/health/log"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/health/log"
     payload = {
         "userId": user_id,
         "mood": mood,
@@ -115,7 +116,8 @@ async def get_health_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/health/log?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/health/log?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:

@@ -125,7 +125,8 @@ async def log_transaction(
     if not user_id:
         return "Error: User ID not found in context. Cannot log transaction."
 
-    url = "http://localhost:3000/api/user/finance/transaction"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/finance/transaction"
     payload = {
         "userId": user_id,
         "type": transaction_type,
@@ -158,7 +159,8 @@ async def get_transaction_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/finance/transaction?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/finance/transaction?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:

@@ -80,7 +80,8 @@ async def log_creative_project(
         for idea in ideas:
             ideas_array.append({"idea_title": idea, "idea_description": idea})
 
-    url = "http://localhost:3000/api/user/creative/project"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/creative/project"
     payload = {
         "userId": user_id,
         "project_name": project_name,
@@ -114,7 +115,8 @@ async def get_creative_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/creative/project?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/creative/project?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:

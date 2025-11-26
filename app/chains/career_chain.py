@@ -74,7 +74,8 @@ async def log_career_activity(
     if not user_id:
         return "Error: User ID not found in context. Cannot log activity."
 
-    url = "http://localhost:3000/api/user/career/activity"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/career/activity"
     payload = {
         "userId": user_id,
         "activity_type": activity_type,
@@ -108,7 +109,8 @@ async def get_career_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/career/activity?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/career/activity?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:

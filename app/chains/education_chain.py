@@ -75,7 +75,8 @@ async def log_study_session(
     if not user_id:
         return "Error: User ID not found in context. Cannot log session."
 
-    url = "http://localhost:3000/api/user/education/session"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/education/session"
     payload = {
         "userId": user_id,
         "subject": subject,
@@ -109,7 +110,8 @@ async def get_study_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/education/session?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/education/session?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
