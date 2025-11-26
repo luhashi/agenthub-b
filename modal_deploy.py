@@ -28,7 +28,9 @@ image = (
         "sse-starlette>=2.2.1",
         "uvicorn>=0.24.0",
         "httpx",
-        "aiosqlite" # Added for DB persistence
+        "aiosqlite",  # Added for DB persistence
+        "asyncpg",  # PostgreSQL async driver for direct DB access
+        "prisma",  # Prisma ORM for database queries
     )
     .add_local_dir("./app", remote_path="/root/app") # Add app directory to image
 )
