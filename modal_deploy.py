@@ -41,7 +41,6 @@ volume = modal.Volume.from_name("fitness-chat-volume", create_if_missing=True)
     secrets=[modal.Secret.from_dotenv()], # Load secrets from local .env file
     volumes={"/data": volume}, # Mount volume to /data
     timeout=600, # 10 minute timeout for long-running agent tasks
-    mounts=[modal.Mount.from_local_dir("app", remote_path="/root/app")]
 )
 @modal.asgi_app()
 def fastapi_app():
