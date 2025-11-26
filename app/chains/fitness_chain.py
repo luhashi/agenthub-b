@@ -145,171 +145,86 @@ General tips for {exercise_name}:
 @tool
 async def log_workout(name: str, exercises: List[dict], config: RunnableConfig, duration_minutes: int = None, notes: str = None) -> str:
     """
-    Log a completed workout session to the user's profile directly to the database.
+    Log a completed workout session to the user's profile.
+
+    Args:
+        name: Name of the workout (e.g., "Leg Day")
+        exercises: List of exercises. Each exercise is a dict with:
+                   - name: str
+                   - notes: str (optional)
+                   - sets: List[dict] where each set has:
+                           - set_number: int
+                           - reps: int
+                           - weight: float (kg)
+                           - rpe: float (optional)
+        duration_minutes: Total duration in minutes (optional)
+        notes: General notes about the session (optional)
     """
-    import asyncpg
-    import uuid
-    from datetime import datetime
+    import aiohttp
     
     user_id = config.get("configurable", {}).get("user_id")
     if not user_id:
         return "Error: User ID not found in context. Cannot log workout."
 
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        return "Error: Database connection not configured."
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+    
+    url = f"{frontend_url}/api/user/fitness/workout"
+    payload = {
+        "userId": user_id,
+        "name": name,
+        "exercises": exercises,
+        "duration_minutes": duration_minutes,
+        "notes": notes
+    }
     
     try:
-        # Force SSL mode for Neon DB
-        conn = await asyncpg.connect(database_url, ssl='require')
-        try:
-            # 1. Get or Create FitnessProfile
-            profile_id = await conn.fetchval(
-                'SELECT id FROM "FitnessProfile" WHERE user_clerk_id = $1',
-                user_id
-            )
-            
-            if not profile_id:
-                profile_id = str(uuid.uuid4())
-                await conn.execute(
-                    '''
-                    INSERT INTO "FitnessProfile" (id, user_clerk_id, "createdAt", "updatedAt")
-                    VALUES ($1, $2, NOW(), NOW())
-                    ''',
-                    profile_id, user_id
-                )
-            
-            # 2. Create WorkoutSession
-            workout_id = str(uuid.uuid4())
-            await conn.execute(
-                '''
-                INSERT INTO "WorkoutSession" (id, fitness_profile_id, name, date, duration_minutes, notes, "createdAt", "updatedAt")
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-                ''',
-                workout_id, profile_id, name, datetime.now(), duration_minutes, notes
-            )
-            
-            # 3. Create Exercises and Sets
-            for ex in exercises:
-                ex_name = ex.get('name')
-                ex_notes = ex.get('notes')
-                
-                ex_id = str(uuid.uuid4())
-                await conn.execute(
-                    '''
-                    INSERT INTO "WorkoutExercise" (id, workout_session_id, exercise_name, notes, "createdAt", "updatedAt")
-                    VALUES ($1, $2, $3, $4, NOW(), NOW())
-                    ''',
-                    ex_id, workout_id, ex_name, ex_notes
-                )
-                
-                sets = ex.get('sets', [])
-                for s in sets:
-                    set_num = s.get('set_number')
-                    reps = s.get('reps')
-                    weight = s.get('weight')
-                    rpe = s.get('rpe')
-                    
-                    set_id = str(uuid.uuid4())
-                    await conn.execute(
-                        '''
-                        INSERT INTO "WorkoutSet" (id, workout_exercise_id, set_number, reps, weight, rpe, "createdAt", "updatedAt")
-                        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-                        ''',
-                        set_id, ex_id, set_num, reps, float(weight) if weight else None, float(rpe) if rpe else None
-                    )
-            
-            # 4. Update Profile Stats (Last Workout)
-            await conn.execute(
-                'UPDATE "FitnessProfile" SET last_workout = $1 WHERE id = $2',
-                datetime.now(), profile_id
-            )
-            
-            return f"Successfully logged workout '{name}' to database."
-            
-        finally:
-            await conn.close()
-            
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return f"Successfully logged workout '{name}'."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to log workout. Status: {response.status}, Error: {error_text}"
     except Exception as e:
-        return f"Error logging workout to database: {str(e)}"
+        return f"Error connecting to database API: {str(e)}"
 
 @tool
 async def get_workout_history(config: RunnableConfig) -> str:
     """
-    Retrieve the user's past workout history from the database.
+    Retrieve the user's past workout history.
     """
-    import asyncpg
+    import aiohttp
     
     user_id = config.get("configurable", {}).get("user_id")
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        return "Error: Database connection not configured."
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+    
+    url = f"{frontend_url}/api/user/fitness/workout?userId={user_id}"
     
     try:
-        # Force SSL mode for Neon DB
-        conn = await asyncpg.connect(database_url, ssl='require')
-        try:
-            # Get fitness profile
-            profile = await conn.fetchrow(
-                'SELECT id FROM "FitnessProfile" WHERE user_clerk_id = $1',
-                user_id
-            )
-            
-            if not profile:
-                return "No workout history found. Start logging your workouts!"
-            
-            # Get recent workouts with exercises and sets
-            workouts = await conn.fetch('''
-                SELECT ws.id, ws.name, ws.date, ws.duration_minutes,
-                       json_agg(
-                           json_build_object(
-                               'exercise_name', we.exercise_name,
-                               'sets', (
-                                   SELECT json_agg(
-                                       json_build_object(
-                                           'set_number', s.set_number,
-                                           'reps', s.reps,
-                                           'weight', s.weight
-                                       ) ORDER BY s.set_number
-                                   )
-                                   FROM "WorkoutSet" s
-                                   WHERE s.workout_exercise_id = we.id
-                               )
-                           ) ORDER BY we.id
-                       ) as exercises
-                FROM "WorkoutSession" ws
-                LEFT JOIN "WorkoutExercise" we ON we.workout_session_id = ws.id
-                WHERE ws.fitness_profile_id = $1
-                GROUP BY ws.id, ws.name, ws.date, ws.duration_minutes
-                ORDER BY ws.date DESC
-                LIMIT 5
-            ''', profile['id'])
-            
-            if not workouts:
-                return "No workout history found."
-            
-            history_str = "Recent Workouts:\n"
-            for w in workouts:
-                date_str = w['date'].strftime('%Y-%m-%d')
-                duration = f" ({w['duration_minutes']} min)" if w['duration_minutes'] else ""
-                history_str += f"- {date_str}: {w['name']}{duration}\n"
-                
-                if w['exercises']:
-                    for ex in w['exercises']:
-                        if ex and ex.get('exercise_name'):
-                            sets_count = len(ex.get('sets', [])) if ex.get('sets') else 0
-                            history_str += f"  * {ex['exercise_name']}: {sets_count} sets\n"
-            
-            return history_str
-            
-        finally:
-            await conn.close()
-            
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    workouts = await response.json()
+                    if not workouts:
+                        return "No workout history found."
+                    
+                    history_str = "Recent Workouts:\n"
+                    for w in workouts[:5]: # Show last 5
+                        history_str += f"- {w['date'].split('T')[0]}: {w['name']} ({w['duration_minutes']} min)\n"
+                        for ex in w['exercises']:
+                            history_str += f"  * {ex['exercise_name']}: {len(ex['sets'])} sets\n"
+                    return history_str
+                else:
+                    return f"Failed to fetch history. Status: {response.status}"
     except Exception as e:
-        return f"Error retrieving workout history: {str(e)}"
+        return f"Error connecting to database API: {str(e)}"
 
 
 async def create_fitness_chain(
