@@ -309,7 +309,8 @@ async def create_fitness_chain(
 
     # Use a file-based SQLite database for persistence
     # We manually create the connection to keep it open
-    conn = await aiosqlite.connect("fitness_chat.db", check_same_thread=False)
+    db_path = os.getenv("DB_PATH", "fitness_chat.db")
+    conn = await aiosqlite.connect(db_path, check_same_thread=False)
     memory = AsyncSqliteSaver(conn)
     graph = graph_builder.compile(checkpointer=memory)
 
