@@ -145,47 +145,92 @@ General tips for {exercise_name}:
 @tool
 async def log_workout(name: str, exercises: List[dict], config: RunnableConfig, duration_minutes: int = None, notes: str = None) -> str:
     """
-    Log a completed workout session to the user's profile.
-
-    Args:
-        name: Name of the workout (e.g., "Leg Day")
-        exercises: List of exercises. Each exercise is a dict with:
-                   - name: str
-                   - notes: str (optional)
-                   - sets: List[dict] where each set has:
-                           - set_number: int
-                           - reps: int
-                           - weight: float (kg)
-                           - rpe: float (optional)
-        duration_minutes: Total duration in minutes (optional)
-        notes: General notes about the session (optional)
+    Log a completed workout session to the user's profile directly to the database.
     """
-    import aiohttp
+    import asyncpg
+    import uuid
+    from datetime import datetime
     
     user_id = config.get("configurable", {}).get("user_id")
     if not user_id:
         return "Error: User ID not found in context. Cannot log workout."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    url = f"{frontend_url}/api/user/fitness/workout"
-    payload = {
-        "userId": user_id,
-        "name": name,
-        "exercises": exercises,
-        "duration_minutes": duration_minutes,
-        "notes": notes
-    }
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return "Error: Database connection not configured."
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
-                if response.status == 200:
-                    return f"Successfully logged workout '{name}'."
-                else:
-                    error_text = await response.text()
-                    return f"Failed to log workout. Status: {response.status}, Error: {error_text}"
+        conn = await asyncpg.connect(database_url)
+        try:
+            # 1. Get or Create FitnessProfile
+            profile_id = await conn.fetchval(
+                'SELECT id FROM "FitnessProfile" WHERE user_clerk_id = $1',
+                user_id
+            )
+            
+            if not profile_id:
+                profile_id = str(uuid.uuid4())
+                await conn.execute(
+                    '''
+                    INSERT INTO "FitnessProfile" (id, user_clerk_id, "createdAt", "updatedAt")
+                    VALUES ($1, $2, NOW(), NOW())
+                    ''',
+                    profile_id, user_id
+                )
+            
+            # 2. Create WorkoutSession
+            workout_id = str(uuid.uuid4())
+            await conn.execute(
+                '''
+                INSERT INTO "WorkoutSession" (id, fitness_profile_id, name, date, duration_minutes, notes, "createdAt", "updatedAt")
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                ''',
+                workout_id, profile_id, name, datetime.now(), duration_minutes, notes
+            )
+            
+            # 3. Create Exercises and Sets
+            for ex in exercises:
+                ex_name = ex.get('name')
+                ex_notes = ex.get('notes')
+                
+                ex_id = str(uuid.uuid4())
+                await conn.execute(
+                    '''
+                    INSERT INTO "WorkoutExercise" (id, workout_session_id, exercise_name, notes, "createdAt", "updatedAt")
+                    VALUES ($1, $2, $3, $4, NOW(), NOW())
+                    ''',
+                    ex_id, workout_id, ex_name, ex_notes
+                )
+                
+                sets = ex.get('sets', [])
+                for s in sets:
+                    set_num = s.get('set_number')
+                    reps = s.get('reps')
+                    weight = s.get('weight')
+                    rpe = s.get('rpe')
+                    
+                    set_id = str(uuid.uuid4())
+                    await conn.execute(
+                        '''
+                        INSERT INTO "WorkoutSet" (id, workout_exercise_id, set_number, reps, weight, rpe, "createdAt", "updatedAt")
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                        ''',
+                        set_id, ex_id, set_num, reps, float(weight) if weight else None, float(rpe) if rpe else None
+                    )
+            
+            # 4. Update Profile Stats (Last Workout)
+            await conn.execute(
+                'UPDATE "FitnessProfile" SET last_workout = $1 WHERE id = $2',
+                datetime.now(), profile_id
+            )
+            
+            return f"Successfully logged workout '{name}' to database."
+            
+        finally:
+            await conn.close()
+            
     except Exception as e:
-        return f"Error connecting to database API: {str(e)}"
+        return f"Error logging workout to database: {str(e)}"
 
 @tool
 async def get_workout_history(config: RunnableConfig) -> str:
