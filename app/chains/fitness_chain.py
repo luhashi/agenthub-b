@@ -166,7 +166,8 @@ async def log_workout(name: str, exercises: List[dict], config: RunnableConfig, 
     if not user_id:
         return "Error: User ID not found in context. Cannot log workout."
 
-    url = "http://localhost:3000/api/user/fitness/workout"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/fitness/workout"
     payload = {
         "userId": user_id,
         "name": name,
@@ -197,7 +198,8 @@ async def get_workout_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    url = f"http://localhost:3000/api/user/fitness/workout?userId={user_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    url = f"{frontend_url}/api/user/fitness/workout?userId={user_id}"
     
     try:
         async with aiohttp.ClientSession() as session:
