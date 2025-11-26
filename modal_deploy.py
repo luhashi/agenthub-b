@@ -15,6 +15,7 @@ image = (
         "langchain-google-genai",
         "langchain-mcp-adapters",
         "langgraph",
+        "langgraph-checkpoint-sqlite",  # Added for LangGraph persistence
         "librosa>=0.10.0",
         "numpy>=1.20.0,<2.0",
         "onnxruntime>=1.23.2",
@@ -29,6 +30,7 @@ image = (
         "httpx",
         "aiosqlite" # Added for DB persistence
     )
+    .add_local_dir("./app", remote_path="/root/app") # Add app directory to image
 )
 
 app = modal.App("serverless-agent-host")
