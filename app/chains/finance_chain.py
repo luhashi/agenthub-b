@@ -35,6 +35,7 @@ Your capabilities include:
 - Calculating savings rates, budgets, and financial metrics
 - **Logging Transactions**: You can save the user's income and expenses to their profile
 - **Tracking Financial Progress**: You can retrieve past transactions to monitor spending patterns
+- **Managing Profile**: You can view and update the user's financial profile (income, goals, etc.)
 
 When interacting with users:
 - Be professional, clear, and financially responsible
@@ -187,6 +188,91 @@ async def get_transaction_history(config: RunnableConfig) -> str:
         return f"Error connecting to database API: {str(e)}"
 
 
+@tool
+async def get_finance_profile(config: RunnableConfig) -> str:
+    """
+    Retrieve the user's finance profile (income, goals, etc).
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot retrieve profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/finance?userId={user_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    profile = await response.json()
+                    return f"""Finance Profile:
+Income: ${profile.get('monthly_income', 0)}
+Savings Goal: ${profile.get('savings_goal', 0)}
+Risk Tolerance: {profile.get('risk_tolerance', 'Not set')}
+Budget Goals: {profile.get('budget_goals', 'Not set')}
+Currency: {profile.get('currency', 'USD')}
+"""
+                else:
+                    return f"Failed to fetch profile. Status: {response.status}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
+@tool
+async def update_finance_profile(
+    config: RunnableConfig,
+    monthly_income: float = None,
+    savings_goal: float = None,
+    currency: str = None,
+    risk_tolerance: str = None,
+    budget_goals: str = None
+) -> str:
+    """
+    Create or update the user's finance profile.
+    
+    Args:
+        monthly_income: Monthly income amount
+        savings_goal: Target savings amount
+        currency: Currency code (default USD)
+        risk_tolerance: "low", "medium", or "high"
+        budget_goals: Description of budget goals
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot update profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/finance"
+    
+    payload = {"userId": user_id}
+    if monthly_income is not None: payload["monthly_income"] = monthly_income
+    if savings_goal is not None: payload["savings_goal"] = savings_goal
+    if currency is not None: payload["currency"] = currency
+    if risk_tolerance is not None: payload["risk_tolerance"] = risk_tolerance
+    if budget_goals is not None: payload["budget_goals"] = budget_goals
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return "Successfully updated finance profile."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to update profile. Status: {response.status}, Error: {error_text}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
 async def create_finance_chain(
     model_name: str = None,
     temperature: float = 0.7,
@@ -210,6 +296,8 @@ async def create_finance_chain(
         budget_recommendation,
         log_transaction,
         get_transaction_history,
+        get_finance_profile,
+        update_finance_profile,
     ]
 
     # Load MCP tools if configured
