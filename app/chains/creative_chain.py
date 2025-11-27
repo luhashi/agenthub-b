@@ -39,7 +39,8 @@ When interacting with users:
 - Help users develop and refine their creative ideas
 - Celebrate creativity in all its forms
 
-Remember: Creativity is a skill that grows with practice. Every idea has potential!"""
+Remember: Creativity is a skill that grows with practice. Every idea has potential!
+- **Managing Profile**: You can view and update the user's creative profile (fields, skills, goals, etc.)"""
 
 
 class CreativeState(TypedDict):
@@ -80,7 +81,13 @@ async def log_creative_project(
         for idea in ideas:
             ideas_array.append({"idea_title": idea, "idea_description": idea})
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        for idea in ideas:
+            ideas_array.append({"idea_title": idea, "idea_description": idea})
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/creative/project"
     payload = {
         "userId": user_id,
@@ -94,7 +101,7 @@ async def log_creative_project(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     return f"Successfully logged creative project '{project_name}'."
                 else:
@@ -115,12 +122,15 @@ async def get_creative_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/creative/project?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     projects = await response.json()
                     if not projects:
@@ -138,6 +148,87 @@ async def get_creative_history(config: RunnableConfig) -> str:
         return f"Error connecting to database API: {str(e)}"
 
 
+@tool
+async def get_creative_profile(config: RunnableConfig) -> str:
+    """
+    Retrieve the user's creative profile (fields, skills, goals).
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot retrieve profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/creative?userId={user_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    profile = await response.json()
+                    return f"""Creative Profile:
+Fields: {profile.get('creative_fields', 'Not set')}
+Skill Level: {profile.get('skill_level', 'Not set')}
+Goals: {profile.get('goals', 'Not set')}
+Preferences: {profile.get('preferences', 'Not set')}
+"""
+                else:
+                    return f"Failed to fetch profile. Status: {response.status}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
+@tool
+async def update_creative_profile(
+    config: RunnableConfig,
+    creative_fields: str = None,
+    skill_level: str = None,
+    goals: str = None,
+    preferences: str = None
+) -> str:
+    """
+    Create or update the user's creative profile.
+    
+    Args:
+        creative_fields: Fields of interest (writing, art, etc.)
+        skill_level: e.g., "beginner", "intermediate"
+        goals: Creative goals
+        preferences: Preferences
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot update profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/creative"
+    
+    payload = {"userId": user_id}
+    if creative_fields is not None: payload["creative_fields"] = creative_fields
+    if skill_level is not None: payload["skill_level"] = skill_level
+    if goals is not None: payload["goals"] = goals
+    if preferences is not None: payload["preferences"] = preferences
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return "Successfully updated creative profile."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to update profile. Status: {response.status}, Error: {error_text}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
 async def create_creative_chain(
     model_name: str = None,
     temperature: float = 0.9,  # Higher temperature for more creativity
@@ -150,6 +241,8 @@ async def create_creative_chain(
     local_tools = [
         log_creative_project,
         get_creative_history,
+        get_creative_profile,
+        update_creative_profile,
     ]
 
     try:

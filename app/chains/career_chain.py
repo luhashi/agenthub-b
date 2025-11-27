@@ -39,7 +39,8 @@ When interacting with users:
 - Help users identify their strengths and areas for growth
 - Tailor guidance to their industry and career goals
 
-Remember: Every career journey is unique. Help users discover and pursue their professional aspirations."""
+Remember: Every career journey is unique. Help users discover and pursue their professional aspirations.
+- **Managing Profile**: You can view and update the user's career profile (role, industry, skills, goals, etc.)"""
 
 
 class CareerState(TypedDict):
@@ -74,7 +75,10 @@ async def log_career_activity(
     if not user_id:
         return "Error: User ID not found in context. Cannot log activity."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/career/activity"
     payload = {
         "userId": user_id,
@@ -88,7 +92,7 @@ async def log_career_activity(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     return f"Successfully logged {activity_type} activity."
                 else:
@@ -109,12 +113,15 @@ async def get_career_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/career/activity?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     activities = await response.json()
                     if not activities:
@@ -132,6 +139,95 @@ async def get_career_history(config: RunnableConfig) -> str:
         return f"Error connecting to database API: {str(e)}"
 
 
+@tool
+async def get_career_profile(config: RunnableConfig) -> str:
+    """
+    Retrieve the user's career profile (role, industry, skills, goals).
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot retrieve profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/career?userId={user_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    profile = await response.json()
+                    return f"""Career Profile:
+Current Role: {profile.get('current_role', 'Not set')}
+Target Role: {profile.get('target_role', 'Not set')}
+Industry: {profile.get('industry', 'Not set')}
+Experience: {profile.get('experience_years', 0)} years
+Skills: {profile.get('skills', 'Not set')}
+Career Goals: {profile.get('career_goals', 'Not set')}
+"""
+                else:
+                    return f"Failed to fetch profile. Status: {response.status}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
+@tool
+async def update_career_profile(
+    config: RunnableConfig,
+    current_role: str = None,
+    target_role: str = None,
+    industry: str = None,
+    experience_years: float = None,
+    skills: str = None,
+    career_goals: str = None
+) -> str:
+    """
+    Create or update the user's career profile.
+    
+    Args:
+        current_role: Current job title
+        target_role: Desired job title
+        industry: Industry sector
+        experience_years: Years of experience
+        skills: Skills list
+        career_goals: Description of goals
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot update profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/career"
+    
+    payload = {"userId": user_id}
+    if current_role is not None: payload["current_role"] = current_role
+    if target_role is not None: payload["target_role"] = target_role
+    if industry is not None: payload["industry"] = industry
+    if experience_years is not None: payload["experience_years"] = experience_years
+    if skills is not None: payload["skills"] = skills
+    if career_goals is not None: payload["career_goals"] = career_goals
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return "Successfully updated career profile."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to update profile. Status: {response.status}, Error: {error_text}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
 async def create_career_chain(
     model_name: str = None,
     temperature: float = 0.7,
@@ -144,6 +240,8 @@ async def create_career_chain(
     local_tools = [
         log_career_activity,
         get_career_history,
+        get_career_profile,
+        update_career_profile,
     ]
 
     try:

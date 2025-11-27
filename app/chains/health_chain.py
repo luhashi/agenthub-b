@@ -39,7 +39,8 @@ When interacting with users:
 - Help users understand their health patterns
 - Celebrate progress and small wins
 
-Disclaimer: This is for informational purposes only. Always consult healthcare professionals for medical advice, diagnosis, or treatment."""
+Disclaimer: This is for informational purposes only. Always consult healthcare professionals for medical advice, diagnosis, or treatment.
+- **Managing Profile**: You can view and update the user's health profile (goals, conditions, medications, etc.)"""
 
 
 class HealthState(TypedDict):
@@ -83,7 +84,13 @@ async def log_health_entry(
     if steps is not None:
         metrics.append({"metric_type": "STEPS", "value": steps, "unit": "steps"})
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    if steps is not None:
+        metrics.append({"metric_type": "STEPS", "value": steps, "unit": "steps"})
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/health/log"
     payload = {
         "userId": user_id,
@@ -95,7 +102,7 @@ async def log_health_entry(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     return f"Successfully logged health entry."
                 else:
@@ -116,12 +123,15 @@ async def get_health_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/health/log?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     logs = await response.json()
                     if not logs:
@@ -140,6 +150,91 @@ async def get_health_history(config: RunnableConfig) -> str:
         return f"Error connecting to database API: {str(e)}"
 
 
+@tool
+async def get_health_profile(config: RunnableConfig) -> str:
+    """
+    Retrieve the user's health profile (goals, conditions, medications).
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot retrieve profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/health?userId={user_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    profile = await response.json()
+                    return f"""Health Profile:
+Age: {profile.get('age', 'Not set')}
+Health Goals: {profile.get('health_goals', 'Not set')}
+Conditions: {profile.get('conditions', 'None')}
+Medications: {profile.get('medications', 'None')}
+Allergies: {profile.get('allergies', 'None')}
+"""
+                else:
+                    return f"Failed to fetch profile. Status: {response.status}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
+@tool
+async def update_health_profile(
+    config: RunnableConfig,
+    age: int = None,
+    health_goals: str = None,
+    conditions: str = None,
+    medications: str = None,
+    allergies: str = None
+) -> str:
+    """
+    Create or update the user's health profile.
+    
+    Args:
+        age: User's age
+        health_goals: Description of health goals
+        conditions: Medical conditions
+        medications: Current medications
+        allergies: Known allergies
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot update profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/health"
+    
+    payload = {"userId": user_id}
+    if age is not None: payload["age"] = age
+    if health_goals is not None: payload["health_goals"] = health_goals
+    if conditions is not None: payload["conditions"] = conditions
+    if medications is not None: payload["medications"] = medications
+    if allergies is not None: payload["allergies"] = allergies
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return "Successfully updated health profile."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to update profile. Status: {response.status}, Error: {error_text}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
 async def create_health_chain(
     model_name: str = None,
     temperature: float = 0.7,
@@ -152,6 +247,8 @@ async def create_health_chain(
     local_tools = [
         log_health_entry,
         get_health_history,
+        get_health_profile,
+        update_health_profile,
     ]
 
     try:

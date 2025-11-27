@@ -40,7 +40,8 @@ When interacting with users:
 - Ask questions to assess comprehension
 - Adapt your teaching style to the user's learning preferences
 
-Remember: Learning is a journey. Celebrate progress and help users develop effective study habits."""
+Remember: Learning is a journey. Celebrate progress and help users develop effective study habits.
+- **Managing Profile**: You can view and update the user's education profile (level, subjects, goals, etc.)"""
 
 
 class EducationState(TypedDict):
@@ -75,7 +76,10 @@ async def log_study_session(
     if not user_id:
         return "Error: User ID not found in context. Cannot log session."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/education/session"
     payload = {
         "userId": user_id,
@@ -89,7 +93,7 @@ async def log_study_session(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     return f"Successfully logged {duration_minutes}-minute study session on {subject}: {topic}."
                 else:
@@ -110,12 +114,15 @@ async def get_study_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/education/session?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     sessions = await response.json()
                     if not sessions:
@@ -132,6 +139,87 @@ async def get_study_history(config: RunnableConfig) -> str:
         return f"Error connecting to database API: {str(e)}"
 
 
+@tool
+async def get_education_profile(config: RunnableConfig) -> str:
+    """
+    Retrieve the user's education profile (level, subjects, goals).
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot retrieve profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/education?userId={user_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    profile = await response.json()
+                    return f"""Education Profile:
+Level: {profile.get('current_level', 'Not set')}
+Subjects: {profile.get('subjects', 'Not set')}
+Learning Style: {profile.get('learning_style', 'Not set')}
+Study Goals: {profile.get('study_goals', 'Not set')}
+"""
+                else:
+                    return f"Failed to fetch profile. Status: {response.status}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
+@tool
+async def update_education_profile(
+    config: RunnableConfig,
+    current_level: str = None,
+    subjects: str = None,
+    learning_style: str = None,
+    study_goals: str = None
+) -> str:
+    """
+    Create or update the user's education profile.
+    
+    Args:
+        current_level: e.g., "high school", "undergraduate"
+        subjects: Subjects being studied
+        learning_style: e.g., "visual", "auditory"
+        study_goals: Description of goals
+    """
+    import aiohttp
+
+    user_id = config.get("configurable", {}).get("user_id")
+    if not user_id:
+        return "Error: User ID not found in context. Cannot update profile."
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
+    url = f"{frontend_url}/api/user/education"
+    
+    payload = {"userId": user_id}
+    if current_level is not None: payload["current_level"] = current_level
+    if subjects is not None: payload["subjects"] = subjects
+    if learning_style is not None: payload["learning_style"] = learning_style
+    if study_goals is not None: payload["study_goals"] = study_goals
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    return "Successfully updated education profile."
+                else:
+                    error_text = await response.text()
+                    return f"Failed to update profile. Status: {response.status}, Error: {error_text}"
+    except Exception as e:
+        return f"Error connecting to database API: {str(e)}"
+
+
 async def create_education_chain(
     model_name: str = None,
     temperature: float = 0.7,
@@ -144,6 +232,8 @@ async def create_education_chain(
     local_tools = [
         log_study_session,
         get_study_history,
+        get_education_profile,
+        update_education_profile,
     ]
 
     try:
