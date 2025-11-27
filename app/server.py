@@ -297,7 +297,7 @@ async def chat_with_fitness_trainer(request: ChatRequest):
 
         # Prepare input for the agent
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         # Invoke the agent
         result = await agent.ainvoke(inputs, config=config)
@@ -333,7 +333,7 @@ async def chat_with_finance_advisor(request: ChatRequest):
 
         agent = app.state.agent_cache[cache_key]
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         result = await agent.ainvoke(inputs, config=config)
         last_message = result["messages"][-1]
@@ -361,7 +361,7 @@ async def chat_with_study_assistant(request: ChatRequest):
 
         agent = app.state.agent_cache[cache_key]
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         result = await agent.ainvoke(inputs, config=config)
         last_message = result["messages"][-1]
@@ -389,7 +389,7 @@ async def chat_with_career_coach(request: ChatRequest):
 
         agent = app.state.agent_cache[cache_key]
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         result = await agent.ainvoke(inputs, config=config)
         last_message = result["messages"][-1]
@@ -417,7 +417,7 @@ async def chat_with_health_monitor(request: ChatRequest):
 
         agent = app.state.agent_cache[cache_key]
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         result = await agent.ainvoke(inputs, config=config)
         last_message = result["messages"][-1]
@@ -445,7 +445,7 @@ async def chat_with_creative_assistant(request: ChatRequest):
 
         agent = app.state.agent_cache[cache_key]
         inputs = {"messages": [HumanMessage(content=request.message)]}
-        config = {"configurable": {"thread_id": thread_id, "user_id": request.user_id}}
+        config = {"configurable": {"thread_id": thread_id}}
 
         result = await agent.ainvoke(inputs, config=config)
         last_message = result["messages"][-1]
