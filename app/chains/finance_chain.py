@@ -125,7 +125,10 @@ async def log_transaction(
     if not user_id:
         return "Error: User ID not found in context. Cannot log transaction."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+    
     url = f"{frontend_url}/api/user/finance/transaction"
     payload = {
         "userId": user_id,
@@ -138,7 +141,7 @@ async def log_transaction(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     return f"Successfully logged {transaction_type.lower()} of ${amount} in category '{category}'."
                 else:
@@ -159,12 +162,15 @@ async def get_transaction_history(config: RunnableConfig) -> str:
     if not user_id:
         return "Error: User ID not found in context. Cannot retrieve history."
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://agenthub-omega.vercel.app")
+    api_secret = os.getenv("GRAPHASH_API_SECRET", "default_secret")
+    headers = {"x-api-secret": api_secret}
+
     url = f"{frontend_url}/api/user/finance/transaction?userId={user_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+            async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     transactions = await response.json()
                     if not transactions:
